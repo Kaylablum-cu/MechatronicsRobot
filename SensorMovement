@@ -1,0 +1,406 @@
+// Pin Definitions
+#define IR_FRONT_LEFT 39 	// Front left IR sensor pin
+#define IR_FRONT_RIGHT 41 	// Front right IR sensor pin
+#define IR_BACK_RIGHT 52   	// Back IR sensor pin
+#define IR_BACK_LEFT 48	//Back IR sensor pin
+#define TRIG_PIN_FRONT 2   	// Ultrasonic sensor TRIG pin
+#define ECHO_PIN_FRONT 3    	// Ultrasonic sensor ECHO pin
+#define TRIG_PIN_R 12   		// Ultrasonic sensor TRIG pin
+#define ECHO_PIN_R 11   	// Ultrasonic sensor ECHO pin
+#define TRIG_PIN_L 42    		// Ultrasonic sensor TRIG pin
+#define ECHO_PIN_L 44   	// Ultrasonic sensor ECHO pin
+
+// Motor control pins
+#define ENA 4 			// LEFT MOTOR
+#define ENB 5			// RIGHT MOTOR
+#define IN1 45 			// LEFT MOTOR
+#define IN2 47			// LEFT MOTORS
+#define IN3 35 			// RIGHT MOTOR
+#define IN4 31			// RIGHT MOTOR
+
+// Speed setting
+#define MOTOR_SPEED 85
+
+// Define states for the state machine
+enum RobotState {
+  FORWARD,
+  BACKWARD,
+  BACK_AFTER_TURN_LEFT,
+  BACK_AFTER_TURN_RIGHT,
+  TURN_LEFT,
+  TURN_RIGHT,
+  BACK_SONAR,
+  BOX_FR, 			//wall on front and right side 
+  BOX_FL, 			//wall on front and left side
+};
+
+// Current state
+RobotState currentState = FORWARD;
+
+//Sensor Data global variables
+bool irFrontLeft;			// IR sensor front left
+bool irFrontRight;			// IR sensor front right
+bool irBackLeft;			// IR sensor back left
+bool irBackRight;			// IR sensor back right
+float distance_FRONT;		// Ultrasonic sensor front
+float distance_R;			// Ultrasonic sensor right
+float distance_L;			// Ultrasonic sensor left
+bool balloon_detect;			// detect balloon from Pixy Cam
+bool multiturnFlag = false;
+bool turnLeftFlag = true; 		// Start by turning left initially
+int balloonX = -1; 
+
+// Function to read the ultrasonic sensor
+float getDistance(int TRIG_PIN, int ECHO_PIN) {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  float distance = (duration / 2.0) * 0.0343; 	// Calculate distance in cm
+  return distance;  }
+
+// Motor control functions
+void stopMotors() {
+  analogWrite(ENA, LOW);
+  analogWrite(ENB, LOW);  }
+
+void moveForward(int speed, int speed2) {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, speed);
+  analogWrite(ENB, speed2);  }
+
+void moveBackward(int speed, int speed2) {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, speed);
+  analogWrite(ENB, speed2);  }
+
+void turnLeft(int speed, int speed2) {
+  digitalWrite(IN1, LOW); // LEFT
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW); // RIGHT
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, speed);
+  analogWrite(ENB, speed2 + 30);  }
+
+void turnRight(int speed, int speed2) {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, speed + 30);
+  analogWrite(ENB, speed2);  }
+
+bool detectBalloon(int &x) {
+  pixy.ccc.getBlocks(); // Retrieve blocks from PixyCam
+  
+  if (pixy.ccc.numBlocks > 0) {
+    for (int i = 0; i < pixy.ccc.numBlocks; i++) {
+      if (pixy.ccc.blocks[i].m_signature == BAD_GUY) {
+        x = pixy.ccc.blocks[i].m_x; // Balloon's X coordinate
+        return true;  }  			// exit out of if statement
+    }		 		// exit out of for statement 
+  }                           			// exit out of if statement
+  return false;  }
+
+void SensorUpdate() {
+ // Read IR sensor states
+  irFrontLeft = digitalRead(IR_FRONT_LEFT);
+  irFrontRight = digitalRead(IR_FRONT_RIGHT);
+  irBackLeft = digitalRead(IR_BACK_LEFT);
+  irBackRight = digitalRead(IR_BACK_RIGHT);
+
+// Read ultrasonic sensor distance
+  distance_FRONT = getDistance(TRIG_PIN_FRONT,ECHO_PIN_FRONT);
+  distance_R = getDistance(TRIG_PIN_R,ECHO_PIN_R);
+  distance_L = getDistance(TRIG_PIN_L,ECHO_PIN_L);
+  balloon_detect = detectBalloon(balloonX);  }
+
+void setup() {
+  Serial.begin(9600);
+  pixy.init();
+  Serial.println("Pixy camera initialized.");
+
+  // Motor pins setup
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  // Sensor pins setup
+  pinMode(IR_FRONT_LEFT, INPUT);
+  pinMode(IR_FRONT_RIGHT, INPUT);
+  pinMode(IR_BACK_LEFT, INPUT);
+  pinMode(IR_BACK_RIGHT, INPUT);
+  pinMode(TRIG_PIN_FRONT, OUTPUT);
+  pinMode(ECHO_PIN_FRONT, INPUT);
+  pinMode(TRIG_PIN_R, OUTPUT);
+  pinMode(ECHO_PIN_R, INPUT);
+  pinMode(TRIG_PIN_L, OUTPUT);
+  pinMode(ECHO_PIN_L, INPUT);  }
+
+void loop() {
+  irFrontLeft = digitalRead(IR_FRONT_LEFT);
+  irFrontRight = digitalRead(IR_FRONT_RIGHT);
+  irBackLeft = digitalRead(IR_BACK_LEFT);
+  irBackRight = digitalRead(IR_BACK_RIGHT);
+
+// Read ultrasonic sensor distance
+  distance_FRONT = getDistance(TRIG_PIN_FRONT,ECHO_PIN_FRONT);
+  distance_R = getDistance(TRIG_PIN_R,ECHO_PIN_R);
+  distance_L = getDistance(TRIG_PIN_L,ECHO_PIN_L);
+  balloon_detect = detectBalloon(balloonX);
+
+  // Print sensor states to the Serial Monitor
+  Serial.print("IR Front Left: ");
+  Serial.print(irFrontLeft);
+  Serial.print(" | IR Front Right: ");
+  Serial.print(irFrontRight);
+  Serial.print(" | Distance: ");
+  Serial.print(distance_FRONT);
+  Serial.print(" cm");
+  Serial.print(" | Right: ");
+  Serial.print(distance_R);
+  Serial.print(" | left: ");
+  Serial.println(distance_L);
+  Serial.println("current state "+currentState);
+
+    // State machine logic
+    switch (currentState) {
+         case FORWARD:
+          Serial.println("case forward");
+
+            for (unsigned long startTime = millis(); millis() - startTime < 10000; ) {
+              Serial.println("Case Forward For Loop");
+                  irFrontLeft = digitalRead(IR_FRONT_LEFT);
+                  irFrontRight = digitalRead(IR_FRONT_RIGHT);
+                  irBackLeft = digitalRead(IR_BACK_LEFT);
+                  irBackRight = digitalRead(IR_BACK_RIGHT);
+                  // Read ultrasonic sensor distance
+                  distance_FRONT = getDistance(TRIG_PIN_FRONT,ECHO_PIN_FRONT);
+                  distance_R = getDistance(TRIG_PIN_R,ECHO_PIN_R);
+                  distance_L = getDistance(TRIG_PIN_L,ECHO_PIN_L);
+                  balloon_detect = detectBalloon(balloonX);
+            // irFrontLeft and irFrontRight detect	
+             if (irFrontLeft == 0 && irFrontRight == 0) {
+                currentState = BACKWARD;
+                break; } 
+            // irFrontLeft detects
+else if (irFrontLeft == 0) {
+                currentState = BACK_AFTER_TURN_RIGHT;
+                break; } 
+           // irFrontRight detects
+else if (irFrontRight == 0) {
+                currentState = BACK_AFTER_TURN_LEFT;
+                break;} 
+          // irBackLeft and irBackRight detect
+else if (irBackLeft == 0 && irBackRight == 0) {
+                currentState = FORWARD;
+                break;} 
+         // ultrasonic front sensor detects less than 10 cm away
+else if (distance_FRONT < 10) {
+                currentState = BACKWARD;
+                break;} 
+         // ultrasonic front and right sensors detect less than 20 cm away
+else if (distance_FRONT < 20 && distance_R < 20) {
+                currentState = BOX_FR;
+                 break;} 
+        // ultrasonic front and left sensors detect less than 20 cm away
+else if (distance_FRONT < 20 && distance_L < 20){
+                currentState = BOX_FL;
+                break;} 
+         // irBackLeft detects
+else if (irBackLeft == 0) {
+                currentState = TURN_LEFT;
+                break;} 
+        // irBackRight detects
+else if (irBackRight == 0) {
+                currentState = TURN_RIGHT;
+                break; }
+        // multiple detections not listed or no detections
+ else {
+                moveForward(MOTOR_SPEED, MOTOR_SPEED);
+                Serial.print("I'm here 2"); }
+          }		// exit for loop
+           break;	// break out of case
+
+        case BOX_FR:
+            Serial.println("Case BOX FR");
+            for (unsigned long startTime = millis(); millis() - startTime < 700; ) {
+            // irBackLeft and irBackRight detect 
+ if (irBackLeft == 0 && irBackRight ==0) {
+                  currentState = FORWARD;
+                  Break;}
+           // irBackLeft detects
+ 	else if (irBackLeft == 0) {
+                currentState = TURN_LEFT;
+                break; } 
+		           // irBackRight detects
+else if (irBackRight == 0) {
+                currentState = TURN_RIGHT;
+                break;} 
+           // nothing is detected
+else {
+                  moveBackward(MOTOR_SPEED+20, MOTOR_SPEED+20);}
+            }		// end of for loop
+
+            if (currentState == BOX_FR) {
+              currentState = TURN_RIGHT;}
+            break; 	// break out of case BOX_FR
+            
+        case BOX_FL:
+              Serial.println("Case BOX FL");
+            for (unsigned long startTime = millis(); millis() - startTime < 700; ) {
+            // irBackLeft and irBackRight detect            
+if (irBackLeft == 0 && irBackRight == 0) {
+                  currentState = FORWARD;
+                  break;}
+           // irBackLeft detects 
+else if (irBackLeft == 0) {
+                currentState = TURN_LEFT;
+                break;}
+           // irBackRight detects
+ else if (irBackRight == 0) {
+                currentState = TURN_RIGHT;
+                break;} 
+          // multiple detections not listed or no detections
+else {
+                  moveBackward(MOTOR_SPEED+20, MOTOR_SPEED+20);}
+            }		// exit out of for loop
+            if (currentState == BOX_FL) {
+              currentState = TURN_LEFT; }
+            break; 	// break out of case BOX_FL
+            
+        case BACKWARD:
+             Serial.println("Case BACKWARD");
+            for (unsigned long startTime = millis(); millis() - startTime < 300; ) {
+            // irBackLeft and irBackRight detect
+            	 if (irBackLeft == 0 && irBackRight == 0) {
+                  currentState = FORWARD;
+                  break;}
+            // irBackLeft detects
+ else if (irBackLeft == 0) {
+                  currentState = TURN_LEFT;
+                  break;} 
+            // irBackRight detects
+else if (irBackRight == 0) {
+                  currentState = TURN_RIGHT;
+                  break;}
+           // multiple detections not listed or no detections 
+else {
+                  moveBackward(MOTOR_SPEED+20, MOTOR_SPEED+20);}
+            } 		// exit out of for loop
+            if (currentState == BACKWARD) { // Ensure the state didn't change
+                currentState = turnLeftFlag ? TURN_LEFT : TURN_RIGHT;
+                turnLeftFlag = !turnLeftFlag;}
+            break;	// exit out of case BACKWARD
+
+        case BACK_AFTER_TURN_LEFT:
+              Serial.println("Case BACK AFTER TURN LEFT");
+            for (unsigned long startTime = millis(); millis() - startTime < 500; ) {
+            // irBackLeft and irBackRight detect
+             if (irBackLeft == 0 && irBackRight == 0) {
+                  currentState = FORWARD;
+                  break;} 
+            // irBackLeft detects
+else if (irBackLeft == 0) {
+                  currentState = TURN_LEFT;
+                  break;} 
+            // irBackRight detects
+else if (irBackRight == 0) {
+                 currentState = TURN_RIGHT;
+                 break;} 
+           // multiple detections not listed or no detections
+else {
+                    moveBackward(MOTOR_SPEED, MOTOR_SPEED);}
+            } 		// exit out of for loop
+            if (currentState == BACK_AFTER_TURN_LEFT) {
+                currentState = TURN_LEFT;}
+            break;	// exit out of case BACK_AFTER_TURN_LEFT
+
+        case BACK_AFTER_TURN_RIGHT:
+              Serial.println("Case BACK AFTER TURN RIGHT");
+            for (unsigned long startTime = millis(); millis() - startTime < 500; ) {
+            // irBackLeft and irBackRight detect
+          	  if (irBackLeft == 0 && irBackRight == 0) {
+                  currentState = FORWARD;
+                  break; } 
+            // irBackLeft detects
+else if (irBackLeft == 0) {
+                 currentState = TURN_LEFT;
+                 break; } 
+            // irBackRight detects
+else if (irBackRight == 0) {
+                 currentState = TURN_RIGHT;
+                 break; } 
+           // multiple detections not listed or no detections
+else {
+                    moveBackward(MOTOR_SPEED, MOTOR_SPEED);}
+            }		// exit out of for loop
+            if (currentState == BACK_AFTER_TURN_RIGHT) {
+                currentState = TURN_RIGHT; }
+            break; 	// break out of case BACK_AFTER_TURN_RIGHT
+
+        case TURN_LEFT:
+              Serial.println("CASE TURN LEFT");
+            for (unsigned long startTime = millis(); millis() - startTime < 600; ) {
+            // irFrontLeft and irFrontRight detect
+                if (irFrontLeft == 0 && irFrontRight == 0) {
+                  currentState = BACKWARD;
+                  break; } 
+           // ifFrontLeft detects
+else if (irFrontLeft == 0) {
+                    currentState = BACK_AFTER_TURN_RIGHT;
+                    break; } 
+          // irFrontRight detects
+else if (irFrontRight == 0) {
+                    currentState = BACK_AFTER_TURN_LEFT;
+                    break; } 
+          // ultrasonic front sensor detects less than 5 cm away
+else if (distance_FRONT < 5) {
+                    currentState = BACKWARD;
+                    break;  }
+         // multiple detections not listed or no detections
+ else {
+                    turnLeft(120, 120);  }
+            }		// exit out of for loop
+            if (currentState == TURN_LEFT) {
+                currentState = FORWARD; }
+            break;	// break out of case TURN_LEFT
+
+        case TURN_RIGHT:
+            Serial.println("Case TURN RIGHT");
+            for (unsigned long startTime = millis(); millis() - startTime < 600; ) {
+            // irFrontLeft and irFrontRight detect
+                if (irFrontLeft == 0 && irFrontRight == 0) {
+                  currentState = BACKWARD;
+                  break; } 
+            // irFrontLeft detects
+else if (irFrontLeft == 0) {
+                    currentState = BACK_AFTER_TURN_RIGHT;
+                    break; } 
+           // irFrontRight detects
+else if (irFrontRight == 0) {
+                    currentState = BACK_AFTER_TURN_LEFT;
+                    break; } 
+           // ultrasonic front sensor detects less than 5 cm away
+else if (distance_FRONT < 5) {
+                    currentState = BACKWARD;
+                    break; } 
+          // multiple detections not listed or no detections
+else {
+                    turnRight(120, 120);  }
+            }		// exit out of for loop
+            if (currentState == TURN_RIGHT) {
+                currentState = FORWARD;  }
+            break;	// break out of case TURN_RIGHT
+
