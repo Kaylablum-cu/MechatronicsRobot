@@ -1,0 +1,5 @@
+// After for loop within case FORWARD:
+// Robot moves forward with no detection for over 10 seconds
+  if (currentState == FORWARD) {
+              currentState = BACKWARD;}
+		
