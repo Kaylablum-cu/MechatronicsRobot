@@ -1,0 +1,176 @@
+case ATTACK:
+  Serial.print("IN ATTACK CASE");
+        SensorUpdate();
+
+        // Nested state machine for ATTACK
+        if (balloon_detect) { 					// Check if balloon is still detected
+          Serial.print("ATTACK: Balloon detected, engaging.");
+          SensorUpdate();
+          myServo.write(forwardAngle);
+
+          switch (currentAttackSubState) {
+            case ATTACK_ALIGN: 					// Centers on the balloon
+                multiturnFlag = false;
+                Serial.print("ATTACK ALIGN ENGAGED");
+   for (unsigned long startTime = millis(); millis() - startTime < 10000;) {
+                  SensorUpdate();
+                  Serial.print("balloon x is ");
+                  Serial.println(balloonX);
+
+      while (balloonX < 140 && irFrontRight == 1 && irFrontLeft == 1) {
+        // Balloon left, no obstacles
+                        Serial.print("Aligning left");
+                        turnLeft(MOTOR_SPEED, MOTOR_SPEED);
+                        SensorUpdate();
+                        if (balloon_detect == false) {break;} } // exit out of while
+                    
+                 while (balloonX > 180 && irFrontRight == 1 && irFrontLeft == 1) {	
+                      // Balloon right, no obstacles
+                      Serial.print("Aligning right");
+                      turnRight(MOTOR_SPEED, MOTOR_SPEED);
+                      SensorUpdate();
+                      if (balloon_detect == false) {break;} } // exit out of while
+                         
+                      // Balloon left, obstacle left
+                      if (balloonX < 140 && irFrontLeft == 0 || balloonX > 140 && balloonX < 180 && irFrontLeft == 0) {
+           Serial.print("Going to reverse left state");  
+           currentAttackSubState = REVERSE_LEFT;
+                        multiturnFlag = true;
+                         break; } // exit out of if
+	      // Balloon left, obstacle right
+                       else if (balloonX < 140 && irFrontRight == 0) {
+                          Serial.print("Going to reverse right");    
+		currentAttackSubState = REVERSE_RIGHT;
+                          break; } // exit out of else if
+	       // Balloon right, obstacle left
+                       else if (balloonX > 180 && irFrontLeft == 0) {  
+             currentAttackSubState = REVERSE_LEFT;
+                          Serial.print("Going to reverse left");
+                          break; } // exit out of else if
+                      // Balloon right, obstacle right
+                      else if (balloonX > 180 && irFrontRight == 0 || balloonX > 140 && balloonX < 180 && irFrontRight == 0) { 
+                         currentAttackSubState = REVERSE_RIGHT;
+                         Serial.print("Going to reverse right");
+                         multiturnFlag = true;
+                         break; } // exit out of else if
+     	      else {
+                          moveForward(MOTOR_SPEED, MOTOR_SPEED);
+                          SensorUpdate(); } // exit out of else		// Aligned, moving forward
+                    } // exit out of for loop
+                if (currentAttackSubState == ATTACK_ALIGN) {
+                    currentAttackSubState = turnLeftFlag ? REVERSE_LEFT : REVERSE_RIGHT;
+                    turnLeftFlag = !turnLeftFlag; } 
+                break; } // exit out of attack align substate
+
+            case REVERSE_LEFT: 					// Robot backs up to the left
+                for (unsigned long startTime = millis(); millis() - startTime < 300;) {
+                    SensorUpdate();
+     // Transition to align if conditions met
+                    if (irBackLeft == 0 || irBackRight == 0) {
+                       currentAttackSubState = ATTACK_ALIGN; 
+                       break; }						 // exit out of if
+     // Reverse to left
+                     else {
+                       moveBackward(MOTOR_SPEED, MOTOR_SPEED); } 		// exit out of else
+                } 							// exit out of for loop
+                if (currentAttackSubState != REVERSE_LEFT) {break;}
+                for (unsigned long startTime = millis(); millis() - startTime < 300;) {
+                    SensorUpdate();
+                    // Transition to align if conditions met
+                    if (irFrontLeft == 0 || irFrontRight == 0) {
+                        currentAttackSubState = ATTACK_ALIGN; 
+                        multiturnFlag = false;
+                        Break; }
+                    else {
+                        turnRight(MOTOR_SPEED, MOTOR_SPEED); }
+                }
+                if (currentAttackSubState != REVERSE_LEFT) {break;}
+                if (multiturnFlag) {
+                    for (unsigned long startTime = millis(); millis() - startTime < 200;) {
+                        SensorUpdate();
+                       // Transition to align if conditions met
+                        if (irFrontLeft == 0 || irFrontRight == 0) {
+                            currentAttackSubState = ATTACK_ALIGN; 
+                            multiturnFlag = false;
+                            break; }
+                        else {
+                            moveForward(MOTOR_SPEED, MOTOR_SPEED); }
+                    }
+                }
+                if (currentAttackSubState != REVERSE_LEFT) {break;}
+                if (multiturnFlag) {
+                    for (unsigned long startTime = millis(); millis() - startTime < 300;) {
+                        SensorUpdate();
+                        // Transition to align if conditions met
+                        if (irFrontLeft == 0 || irFrontRight == 0) {
+                            currentAttackSubState = ATTACK_ALIGN; 
+                            multiturnFlag = false;
+                            break; }
+                        else {
+                            turnLeft(MOTOR_SPEED, MOTOR_SPEED); }
+                    }
+                    currentAttackSubState = ATTACK_ALIGN;
+                    multiturnFlag = false; }
+                break;
+
+            case REVERSE_RIGHT: // Robot backs up to the right
+                for (unsigned long startTime = millis(); millis() - startTime < 300;) {
+                    SensorUpdate();
+                   // Transition to align if conditions met
+                    if (irBackLeft == 0 || irBackRight == 0) {
+                        currentAttackSubState = ATTACK_ALIGN; 
+                        break; }
+                   // Reverse to the right
+                   else {
+                        moveBackward(MOTOR_SPEED, MOTOR_SPEED); }
+                }
+                if (currentAttackSubState != REVERSE_RIGHT) {break;}
+                for (unsigned long startTime = millis(); millis() - startTime < 300;) {
+                    SensorUpdate();
+                    // Transition to align if conditions met
+                    if (irFrontLeft == 0 || irFrontRight == 0) {
+                        currentAttackSubState = ATTACK_ALIGN; 
+                        multiturnFlag = false;
+                        break; }
+                    else {
+                        turnLeft(MOTOR_SPEED, MOTOR_SPEED); }
+                }
+                if (currentAttackSubState != REVERSE_RIGHT) {break;}
+                if (multiturnFlag) {
+                    for (unsigned long startTime = millis(); millis() - startTime < 200;) {
+                        SensorUpdate();
+        // Transition to align if conditions met
+                        if (irFrontLeft == 0 || irFrontRight == 0) {
+                            currentAttackSubState = ATTACK_ALIGN; 
+                            multiturnFlag = false;
+                            break; }
+                        else {
+                            moveForward(MOTOR_SPEED, MOTOR_SPEED); }
+                     }
+                }
+                if (currentAttackSubState != REVERSE_RIGHT) {break;}
+                if (multiturnFlag) {
+                    for (unsigned long startTime = millis(); millis() - startTime < 300;) {
+                        SensorUpdate();
+        // Transition to align if conditions met
+                        if (irFrontLeft == 0 || irFrontRight == 0) {
+                            currentAttackSubState = ATTACK_ALIGN; 
+                            multiturnFlag = false;
+                            break; }
+                        else {
+                            turnRight(MOTOR_SPEED, MOTOR_SPEED); }
+                     }
+                    currentAttackSubState = ATTACK_ALIGN;
+                    multiturnFlag = false; }
+                break; } }
+    else {
+        // Balloon lost: Exit ATTACK state
+        Serial.print("ATTACK: Balloon lost, exiting.");
+        currentState = FORWARD;
+        myServo.write(backwardAngle);
+        currentAttackSubState = ATTACK_ALIGN; }
+    break;
+         default:
+          Serial.println("IN DEFAULT");
+          currentState = FORWARD;
+          break; } }
