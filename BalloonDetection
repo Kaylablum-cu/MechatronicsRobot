@@ -1,0 +1,42 @@
+#include <Pixy2.h>
+// Variables
+Pixy2 pixy;
+const int RED_SIGNATURE = 1;    // Adjust based on Pixy signature ID for red
+const int BLUE_SIGNATURE = 2;  // Adjust based on Pixy signature ID for blue
+
+void setup() {
+  Serial.begin(9600);		        // initialize pixy
+  pixy.init();
+  Serial.println("Pixy camera initialized.");  }
+
+void loop() {
+  pixy.ccc.getBlocks();  	       // Get blocks (detected objects) from Pixy
+
+  if (pixy.ccc.numBlocks > 0) {  // If any objects are detected
+	for (int i = 0; i < pixy.ccc.numBlocks; i++) {
+  	int signature = pixy.ccc.blocks[i].m_signature;
+  	int width = pixy.ccc.blocks[i].m_width;      // Width of detected block
+  	int height = pixy.ccc.blocks[i].m_height;   // Height of detected block
+
+  	// Check for red balloon
+  	if (signature == RED_SIGNATURE) {
+    	Serial.println("Red balloon detected!");
+    	Serial.print("Size - Width: ");
+    	Serial.print(width);
+    	Serial.print(" Height: ");
+    	Serial.println(height);
+  	}
+ 	 
+  	// Check for blue balloon
+  	else if (signature == BLUE_SIGNATURE) {
+    	Serial.println("Blue balloon detected!");
+    	Serial.print("Size - Width: ");
+    	Serial.print(width);
+    	Serial.print(" Height: ");
+    	Serial.println(height); }
+	}	// exit out of for loop
+  } 		// exit out of if statement
+  else {
+	Serial.println("No balloons detected.");  }
+  delay(1000);  	// Small delay for readability in serial monitor
+}		// exit out of void loop
