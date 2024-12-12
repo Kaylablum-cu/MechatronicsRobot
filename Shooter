@@ -1,0 +1,56 @@
+#include <Servo.h>
+
+// Define pins
+const int servoPin = 2; 		//orange control pin of the servo
+int motorA = 13;			// ENA pin
+const int motorAForward = 11;	// IN1 pin
+const int motorABackward = 10;	// IN2 pin
+int motorB = 12;			// ENB pin
+const int motorBForward = 9;	// IN3 pin
+const int motorBBackward = 8;	// IN4 pin
+
+// Create Servo object for servo motor
+Servo myServo;
+
+void setup() {
+
+  // Attach the servo
+  myServo.attach(servoPin);
+
+  // Set motor pins as outputs
+  pinMode(motorA, OUTPUT);
+  pinMode(motorB, OUTPUT);
+  pinMode(motorAForward, OUTPUT);
+  pinMode(motorABackward, OUTPUT);
+  pinMode(motorBForward, OUTPUT);
+  pinMode(motorBBackward, OUTPUT);  }
+
+void loop() {
+  // Shooter motors
+  myServo.write(130); // turn servo to a degrees that pushes forward
+  delay(500);  		// Wait for the servo to reach the position
+  myServo.write(70);   // turn servo to a degree that pulls back
+  startMotor();		// turn on the motors (function)
+  delay(200); 		// Wait for the servo to reach the position
+  stopMotors();		// stop motors (function)
+  delay(1000);  }
+
+// Function startMotor
+void startMotor() {
+  // Spin DC motors in opposite directions
+  // Motor A spins forward
+  digitalWrite(motorAForward, HIGH);
+  digitalWrite(motorABackward, LOW);
+  digitalWrite(motorA, HIGH);
+
+  // Motor B spins backward
+  digitalWrite(motorBForward, HIGH);
+  digitalWrite(motorBBackward, LOW);
+  digitalWrite(motorB, HIGH); }
+
+// Function stopMotors
+void stopMotors() {
+  digitalWrite(motorAForward, LOW);
+  digitalWrite(motorABackward, LOW);
+  digitalWrite(motorBForward, LOW);
+  digitalWrite(motorBBackward, LOW); }
